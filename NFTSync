@@ -1,0 +1,100 @@
+import requests
+import pandas as pd
+import matplotlib.pyplot as plt
+from datetime import datetime
+
+class NFTSync:
+    def __init__(self):
+        self.api_url = 'https://api.opensea.io/api/v1'
+
+    def get_collections(self, offset: int = 0, limit: int = 50) -> pd.DataFrame:
+        """Fetches a list of NFT collections."""
+        url = f"{self.api_url}/collections"
+        params = {
+            'offset': offset,
+            'limit': limit
+        }
+        response = requests.get(url, params=params)
+        collections = response.json().get('collections', [])
+        return pd.DataFrame(collections)
+
+    def get_collection_data(self, slug: str) -> dict:
+        """Fetches data for a specific NFT collection."""
+        url = f"{self.api_url}/assets"
+        params = {
+            'order_direction': 'desc',
+            'offset': 0,
+            'limit': 1,
+            'collection': slug
+        }
+        response = requests.get(url, params=params)
+        return response.json()
+
+    def get_nft_data(self, token_id: str, slug: str) -> dict:
+        """Fetches data for a specific NFT token."""
+        url = f"{self.api_url}/assets/{token_id}"
+        params = {
+            'collection': slug
+        }
+        response = requests.get(url, params=params)
+        return response.json()
+
+    def get_market_data(self, slug: str) -> dict:
+        """Fetches market data for a specific NFT collection."""
+        url = f"{self.api_url}/collections/{slug}/stats"
+        response = requests.get(url)
+        return response.json()
+
+    def plot_price_trends(self, slug: str, days: int = 30):
+        """Plots historical price trends for a specific NFT collection."""
+        url = f"{self.api_url}/collections/{slug}/stats"
+        params = {
+            'days': days
+        }
+        response = requests.get(url, params=params)
+        data = response.json().get('stats', {}).get('price', [])
+        
+        if not data:
+            print("No price data found.")
+            return
+
+        df = pd.DataFrame(data)
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
+        df.set_index('timestamp', inplace=True)
+
+        plt.figure(figsize=(12, 6))
+        df['price'].plot()
+        plt.title(f'{slug.capitalize()} NFT Price Trend')
+        plt.xlabel('Date')
+        plt.ylabel('Price (USD)')
+        plt.grid(True)
+        plt.show()
+
+# Example Usage
+if __name__ == "__main__":
+    nft_sync = NFTSync()
+
+    # Fetch and Display NFT Collections
+    collections = nft_sync.get_collections()
+    print("Available NFT Collections:")
+    print(collections[['slug', 'name', 'description']].head())
+
+    # Fetch and Display Collection Data
+    collection_slug = 'boredapeyachtclub'  # Replace with the slug of interest
+    collection_data = nft_sync.get_collection_data(collection_slug)
+    print(f"Data for collection {collection_slug.capitalize()}:")
+    print(collection_data)
+
+    # Fetch and Display NFT Data
+    token_id = '1'  # Replace with the token ID of interest
+    nft_data = nft_sync.get_nft_data(token_id, collection_slug)
+    print(f"Data for NFT Token ID {token_id}:")
+    print(nft_data)
+
+    # Fetch and Display Market Data
+    market_data = nft_sync.get_market_data(collection_slug)
+    print("Market Data for Collection:")
+    print(market_data)
+
+    # Plot Historical Price Trends
+    nft_sync.plot_price_trends(slug=collection_slug, days=30)  # Example collection
